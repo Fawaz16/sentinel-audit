@@ -319,6 +319,7 @@ Then:
 | `npm run dev` | Start the lab UI, bound to `127.0.0.1` only. |
 | `npm run dev:lan` | Start it on **all** interfaces. See the warning below. |
 | `npm run build` | Production build. Needs `.env.local` to be filled in. |
+| `npm start` | Serve the production build, also bound to `127.0.0.1`. |
 | `npm run forge -- help` | The Morse key forge. |
 | `npm run forge -- secrets` | Generate fresh lab secrets. |
 
