@@ -64,7 +64,7 @@ captain-foxv1/
 ### Commands
 
 ```bash
-npm test                  # 51 tests. No database, no API key, no network.
+npm test                  # 62 tests. No database, no API key, no network.
 npm run typecheck         # tsc --noEmit across app, scripts and tests
 npm run verify            # typecheck + test — what CI runs
 npm run dev               # the lab UI on :3000
@@ -83,8 +83,8 @@ required variables are `NEXT_PUBLIC_SUPABASE_URL`,
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
-FRK36_CIPHER_SEED="FAWAZ_RUFAI_KUNLE_36"
-AGENT_AUTH_SECRET="captain-foxv1-thamesfreight-hmac-secret"
+FRK36_CIPHER_SEED="CHANGE_ME_run_npm_run_forge_secrets"
+AGENT_AUTH_SECRET="CHANGE_ME_run_npm_run_forge_secrets"
 ```
 
 > After running `supabase/schema.sql`, add `captain_fox` to

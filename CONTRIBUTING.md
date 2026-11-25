@@ -26,7 +26,8 @@ Also welcome:
 ## Before you open a PR
 
 ```bash
-npm run verify     # typecheck + 51 tests
+git config core.hooksPath .githooks   # once per clone: blocks committing secrets
+npm run verify                        # typecheck + 62 tests
 ```
 
 Both must pass. `npm run build` additionally needs a filled-in `.env.local`, so

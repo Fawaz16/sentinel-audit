@@ -241,7 +241,7 @@ name arriving by some other path returns `SECURITY_BLOCK`.
   22.18 onward; 24 LTS is the easy choice. Check with `node --version`.
 - A **free Supabase project** ([supabase.com](https://supabase.com)) — use a new throwaway one
 - *Optional:* an **Anthropic API key** for the `✦ CLAUDE` adversary toggle.
-  Everything else, including all 51 tests, runs without it.
+  Everything else, including all 62 tests, runs without it.
 
 ### 1. Clone and install
 
@@ -257,7 +257,7 @@ npm install
 npm test
 ```
 
-51 tests, no database, no API key, no network. They cover both ciphers, HMAC
+62 tests, no database, no API key, no network. They cover both ciphers, HMAC
 verification, every taint path, schema rejection, and the Biba lockout. If these
 pass, the defences in this README are real on your machine.
 
@@ -267,6 +267,11 @@ pass, the defences in this README are real on your machine.
 2. Paste all of [`supabase/schema.sql`](supabase/schema.sql) and **Run**
 3. **Don't skip this:** Dashboard → **Project Settings → API → Exposed schemas**
    → add `captain_fox`
+
+> Already set this up from an earlier copy? Re-run the file. The grants are now
+> column-scoped (`UPDATE (current_destination, updated_at)` on `shipments`
+> rather than the whole table), so the client can no longer rewrite
+> `authorized_destination` — the baseline the UI compares a reroute against.
 
    The app connects with `db: { schema: "captain_fox" }`. Without step 3, every
    query fails. It is the single most common setup problem with this repo.
@@ -283,6 +288,11 @@ Project Settings → API, and paste in the generated secrets.
 
 Use the **anon** key. The `service_role` key must never appear in this project —
 see [Design invariants](#design-invariants).
+
+`npm run forge -- secrets` is not optional. The route **refuses to start** on a
+placeholder or short `AGENT_AUTH_SECRET`, because each response returns a
+manifest together with its HMAC — a guessable secret would be recoverable
+offline from a single response.
 
 ### 5. Run it
 
@@ -306,9 +316,28 @@ Then:
 | `npm test` | Full cipher + guard test suite. No credentials needed. |
 | `npm run typecheck` | `tsc --noEmit` across app, scripts, and tests. |
 | `npm run verify` | Typecheck then test — what CI runs. |
-| `npm run dev` | Start the lab UI. |
+| `npm run dev` | Start the lab UI, bound to `127.0.0.1` only. |
+| `npm run dev:lan` | Start it on **all** interfaces. See the warning below. |
 | `npm run build` | Production build. Needs `.env.local` to be filled in. |
 | `npm run forge -- help` | The Morse key forge. |
+| `npm run forge -- secrets` | Generate fresh lab secrets. |
+
+### Two things to know before you run it
+
+**`npm run dev` deliberately binds `127.0.0.1`, not every interface.** Next's
+default would also serve your LAN, and `/api/simulate` has no authentication:
+anyone who could reach port 3000 could run the attack and read the vault
+contents straight out of the JSON response. `npm run dev:lan` opts back in — only
+do that on a network you trust.
+
+**Enable the secret-blocking commit hook, once per clone:**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+It refuses any commit containing a `.env` file, an Anthropic key, a Supabase
+JWT, an AWS key id, a private key block, or a `service_role` key assignment.
 
 ---
 
@@ -491,6 +520,8 @@ Constraints the code holds itself to. Each one is a position, not a style choice
 | Every query fails, or `relation ... does not exist` | `captain_fox` is not in **Project Settings → API → Exposed schemas**. This is the usual one. |
 | `Missing NEXT_PUBLIC_SUPABASE_URL ...` at startup | No `.env.local`. `cp .env.example .env.local` and fill it in. |
 | `Missing AGENT_AUTH_SECRET` / `Missing FRK36_CIPHER_SEED` | Those two lines are absent from `.env.local`. `npm run forge -- secrets` generates both. |
+| `AGENT_AUTH_SECRET is a known placeholder value` (HTTP 500) | Working as intended. The API returns each manifest together with its HMAC, so a guessable secret could be recovered offline. Run `npm run forge -- secrets`. |
+| `AGENT_AUTH_SECRET is N characters; at least 24 are required` | Same gate, same fix. |
 | `Anthropic API 401` | Bad or missing `ANTHROPIC_API_KEY`. Only the `✦ CLAUDE` adversary needs it — switch to `⚙ SCRIPTED`. |
 | `SyntaxError: Unexpected token` from `npm test` or `npm run forge` | Node is older than 22.18 and cannot run TypeScript directly. Upgrade, or add `--experimental-strip-types` to the script. Check `node --version`. |
 | `npm run build` fails on env vars | The build imports `supabase.ts`, which requires the Supabase vars. Fill in `.env.local` first. `npm run verify` needs nothing. |

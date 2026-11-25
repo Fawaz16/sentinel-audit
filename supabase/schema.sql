@@ -126,10 +126,16 @@ CREATE POLICY "demo read customs_vault"
   ON captain_fox.customs_vault FOR SELECT
   USING (true);
 
--- Attacker sink: the mock inbox needs insert, and the UI needs read.
-CREATE POLICY "demo insert/read attacker_sink"
-  ON captain_fox.attacker_sink FOR ALL
-  USING (true) WITH CHECK (true);
+-- Attacker sink: the mock inbox needs insert, and the UI needs read. Spelled as
+-- two narrow policies rather than FOR ALL, so the policy matches the grant and
+-- neither UPDATE nor DELETE is permitted by either layer.
+CREATE POLICY "demo insert attacker_sink"
+  ON captain_fox.attacker_sink FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "demo read attacker_sink"
+  ON captain_fox.attacker_sink FOR SELECT
+  USING (true);
 
 -- Audit log: append-only. No UPDATE or DELETE policy exists, and with RLS on,
 -- an operation without a matching policy is denied.
@@ -150,7 +156,14 @@ CREATE POLICY "read audit log"
 -- ---------------------------------------------------------------------------
 GRANT USAGE ON SCHEMA captain_fox TO anon, authenticated;
 
-GRANT SELECT, UPDATE         ON captain_fox.shipments          TO anon, authenticated;
+-- Shipments: read freely, but write ONLY the two columns `reroute_container`
+-- actually touches. A table-level UPDATE grant would also let the client
+-- rewrite `authorized_destination` — the field the UI compares against to judge
+-- whether a reroute was legitimate. An attacker who can edit the baseline can
+-- make any diversion look authorised, so the grant is column-scoped.
+GRANT SELECT                                      ON captain_fox.shipments TO anon, authenticated;
+GRANT UPDATE (current_destination, updated_at)    ON captain_fox.shipments TO anon, authenticated;
+
 GRANT SELECT                 ON captain_fox.customs_vault      TO anon, authenticated;
 GRANT SELECT, INSERT         ON captain_fox.attacker_sink      TO anon, authenticated;
 GRANT SELECT, INSERT         ON captain_fox.security_audit_log TO anon, authenticated;

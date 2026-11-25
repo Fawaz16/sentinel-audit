@@ -18,6 +18,7 @@ import {
 import {
   BIBA_LOCKED_TOOLS,
   applyBibaTaintLockout,
+  assertStrongAuthSecret,
   inspectManifestHandoff,
   signHandoff,
   verifyHandoffSignature,
@@ -102,6 +103,86 @@ describe("guard: agent identity (HMAC)", () => {
     assert.equal(result.tainted, true);
     assert.equal(result.sanitizedPayload, null);
     assert.ok(result.alerts[0].startsWith("AUTH_FAILURE"));
+  });
+});
+
+describe("guard: canonical signing", () => {
+  test("key order does not change the signature", () => {
+    const a = { manifest_id: "MAN-4412", container_id: "CONT-UK-88412", timestamp: 1 };
+    const b = { timestamp: 1, container_id: "CONT-UK-88412", manifest_id: "MAN-4412" };
+    assert.equal(signHandoff(a, SECRET), signHandoff(b, SECRET));
+    assert.ok(verifyHandoffSignature(b, signHandoff(a, SECRET), SECRET));
+  });
+
+  test("canonicalizes nested objects and arrays", () => {
+    const a = { x: [{ p: 1, q: 2 }], y: { m: 3, n: 4 } };
+    const b = { y: { n: 4, m: 3 }, x: [{ q: 2, p: 1 }] };
+    assert.equal(signHandoff(a, SECRET), signHandoff(b, SECRET));
+  });
+
+  test("array order still matters — it is data, not spelling", () => {
+    assert.notEqual(signHandoff({ v: [1, 2] }, SECRET), signHandoff({ v: [2, 1] }, SECRET));
+  });
+
+  test("different content still gives different signatures", () => {
+    assert.notEqual(
+      signHandoff(cleanPacket(), SECRET),
+      signHandoff(cleanPacket({ container_id: "CONT-UK-00001" }), SECRET)
+    );
+  });
+
+  test("refuses to sign values it cannot canonicalize", () => {
+    assert.throws(() => signHandoff({ n: Number.NaN }, SECRET), /non-finite/);
+    assert.throws(() => signHandoff({ f: () => 1 }, SECRET), /type function/);
+  });
+
+  test("signs the real FRK36 telemetry packet", () => {
+    const packet = cleanPacket({ iot_telemetry: packFRK36Telemetry(DIRECTIVE, SEED) });
+    assert.ok(verifyHandoffSignature(packet, signHandoff(packet, SECRET), SECRET));
+  });
+});
+
+describe("guard: AGENT_AUTH_SECRET strength gate", () => {
+  test("rejects missing, placeholder, and short secrets", () => {
+    assert.throws(() => assertStrongAuthSecret(undefined), /Missing AGENT_AUTH_SECRET/);
+    assert.throws(() => assertStrongAuthSecret(""), /Missing AGENT_AUTH_SECRET/);
+    // The value .env.example used to ship — recoverable from a tiny dictionary.
+    assert.throws(
+      () => assertStrongAuthSecret("captain-foxv1-thamesfreight-hmac-secret"),
+      /known placeholder/
+    );
+    assert.throws(() => assertStrongAuthSecret("CHANGE_ME_run_npm_run_forge_secrets"), /known placeholder/);
+    assert.throws(() => assertStrongAuthSecret("short-secret"), /at least 24/);
+  });
+
+  test("accepts a forge-generated secret", () => {
+    const generated = "Hmu_oX2TIlceObGuVeoD8MW6J4lWpL3uQwZHJBK9Kqs";
+    assert.equal(assertStrongAuthSecret(generated), generated);
+  });
+});
+
+describe("guard: oversized fields", () => {
+  test("truncates and taints a field larger than the inspection cap", () => {
+    const result = inspect(cleanPacket({ cargo_summary: "A".repeat(50_000) }));
+    assert.equal(result.tainted, true);
+    const alert = result.alerts.find((a) => a.startsWith("OVERSIZED_FIELD"));
+    assert.ok(alert, "expected an OVERSIZED_FIELD alert");
+    assert.ok(alert.includes("50000"));
+    // Zod's own 500-char limit then rejects it outright.
+    assert.equal(result.allowed, false);
+  });
+
+  test("inspection stays fast on a large hostile field", () => {
+    const hostile = cleanPacket({ cargo_summary: ".- ".repeat(100_000) });
+    const started = process.hrtime.bigint();
+    inspect(hostile);
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    assert.ok(ms < 500, `inspection took ${ms.toFixed(1)}ms`);
+  });
+
+  test("a normal-length field is untouched", () => {
+    const result = inspect(cleanPacket());
+    assert.equal(result.alerts.some((a) => a.startsWith("OVERSIZED_FIELD")), false);
   });
 });
 

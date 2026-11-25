@@ -28,9 +28,19 @@ tools and tables:
   the blast radius of a misconfiguration.
 - **Do not reuse the committed example secrets.** Everything in `.env.example`
   is a public placeholder. Run `npm run forge -- secrets` for fresh values.
-- **Do not deploy this publicly.** There is no authentication on the simulate
-  endpoint; anyone who can reach it can run the attacks and read the vault
-  contents from the response. It is a localhost lab.
+- **Do not deploy this publicly.** There is no authentication on
+  `/api/simulate`; anyone who can reach it can run the attacks, read the vault
+  contents out of the JSON response, and spend your Anthropic credits. It is a
+  localhost lab. `npm run dev` therefore binds `127.0.0.1` explicitly, because
+  Next's default also serves your LAN. `npm run dev:lan` opts back in; only use
+  it on a network you trust.
+- **Use a high-entropy `AGENT_AUTH_SECRET`.** The response returns each manifest
+  together with its HMAC, which is a verifiable (plaintext, MAC) pair — an
+  offline cracking oracle. That is acceptable for a teaching UI only while the
+  secret has real entropy, so the route refuses to run on a placeholder or on
+  anything under 24 characters. Run `npm run forge -- secrets`.
+- **Enable the commit hook** (`git config core.hooksPath .githooks`) so an env
+  file or a live key cannot be committed by accident.
 
 ## Reporting a vulnerability
 
@@ -59,6 +69,19 @@ affects this code.
 
 Please include the version or commit, reproduction steps, and what an attacker
 would gain. Expect an initial response within a week.
+
+## Known and accepted
+
+These are deliberate properties of a teaching lab, documented rather than fixed.
+If one of them matters to you, the mitigation is noted.
+
+| Property | Why it is this way | Mitigation |
+|---|---|---|
+| `/api/simulate` is unauthenticated | The lab is a single-user localhost tool; auth would add setup friction for no teaching value | Bound to `127.0.0.1` by default |
+| The response returns the manifest and its HMAC | Showing the signature is pedagogically useful — it is what makes "identity ≠ integrity" concrete | Enforced minimum secret entropy |
+| RLS policies are `USING (true)` | The exfiltration demo needs readable secrets | Use a throwaway project; tables live in `captain_fox`, not `public` |
+| `INVISIBLE_UNICODE` is a deny-list with known gaps | It is a detector, not the boundary; the schema allow-list and Biba lockout are | Exercise 6 in `docs/LAB-EXERCISES.md` walks through it |
+| No replay protection on manifests | Out of scope for the current guard | Exercise 10 asks you to add it |
 
 ## Out of scope
 

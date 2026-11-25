@@ -1,0 +1,77 @@
+#!/bin/sh
+# Blocks secrets from being committed. Enable once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# Bypass only when you are certain:  git commit --no-verify
+#
+# POSIX sh: no bashisms, so this works under dash as well as bash.
+
+set -eu
+
+flag=$(mktemp)
+# shellcheck disable=SC2064
+trap "rm -f '$flag'" EXIT INT TERM
+
+# git quotes paths containing newlines or other special characters (core.quotePath
+# is on by default), so newline-delimited reading is safe here.
+git diff --cached --name-only --diff-filter=ACM | while IFS= read -r f; do
+  [ -n "$f" ] || continue
+
+  # 1. Env files. .env.example is the one committed template.
+  case "$f" in
+    .env.example) ;;
+    .env|.env.*|*/.env|*/.env.*)
+      echo "BLOCKED: $f is an env file and must not be committed."
+      echo blocked >>"$flag"
+      ;;
+  esac
+
+  # This file names the patterns it hunts for, so skip scanning it.
+  case "$f" in
+    .githooks/pre-commit) continue ;;
+  esac
+
+  # 2. Live credential shapes, read from the STAGED blob rather than the working
+  #    tree, so content that was reverted on disk cannot slip through.
+  content=$(git show ":$f" 2>/dev/null || true)
+  [ -n "$content" ] || continue
+
+  if printf '%s' "$content" | grep -qE 'sk-ant-[A-Za-z0-9_-]{20,}'; then
+    echo "BLOCKED: $f contains what looks like an Anthropic API key."
+    echo blocked >>"$flag"
+  fi
+
+  if printf '%s' "$content" | grep -qE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.'; then
+    echo "BLOCKED: $f contains what looks like a JWT (Supabase anon/service key)."
+    echo blocked >>"$flag"
+  fi
+
+  # A service_role key being ASSIGNED a value — not merely the words
+  # "service_role", which the docs discuss on purpose.
+  if printf '%s' "$content" | grep -qiE 'SERVICE_ROLE(_KEY)?[[:space:]]*[=:][[:space:]]*["'"'"']?(eyJ|sb_|[A-Za-z0-9_-]{30,})'; then
+    echo "BLOCKED: $f appears to assign a Supabase service_role key."
+    echo "         Invariant 1: this project uses the anon key with RLS only."
+    echo blocked >>"$flag"
+  fi
+
+  if printf '%s' "$content" | grep -qE 'AKIA[0-9A-Z]{16}'; then
+    echo "BLOCKED: $f contains what looks like an AWS access key id."
+    echo blocked >>"$flag"
+  fi
+
+  if printf '%s' "$content" | grep -q -- '-----BEGIN .*PRIVATE KEY-----'; then
+    echo "BLOCKED: $f contains a private key block."
+    echo blocked >>"$flag"
+  fi
+done
+
+# The loop body runs in a subshell (it is the right-hand side of a pipe), so the
+# flag file — not a shell variable — carries the verdict back out.
+if [ -s "$flag" ]; then
+  echo ""
+  echo "Commit aborted. Remove the secret, or bypass with --no-verify if this is a false positive."
+  exit 1
+fi
+
+exit 0

@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege for GITHUB_TOKEN. This workflow only reads the repo; it never
+# pushes, comments, or publishes. Note the trigger is `pull_request`, not
+# `pull_request_target`, so a fork's code runs without access to repo secrets.
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: typecheck + tests (Node ${{ matrix.node }})

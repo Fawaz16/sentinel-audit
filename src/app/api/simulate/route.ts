@@ -15,6 +15,7 @@ import {
 } from "@/lib/ciphers";
 import {
   applyBibaTaintLockout,
+  assertStrongAuthSecret,
   BIBA_LOCKED_TOOLS,
   inspectManifestHandoff,
   signHandoff,
@@ -336,8 +337,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "vector must be STANDARD_MORSE or FRK36_TELEMETRY" }, { status: 400 });
   }
 
-  const authSecret = process.env.AGENT_AUTH_SECRET;
-  if (!authSecret) return NextResponse.json({ error: "Missing AGENT_AUTH_SECRET" }, { status: 500 });
+  // Refuse to run on a placeholder or low-entropy secret: the response below
+  // returns the manifest and its HMAC together, which is an offline cracking
+  // oracle for anyone who can reach this endpoint.
+  let authSecret: string;
+  try {
+    authSecret = assertStrongAuthSecret(process.env.AGENT_AUTH_SECRET);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
   const seed = getCipherSeed();
 
   // 1. Upstream agent signs its (poisoned) handoff

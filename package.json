@@ -9,7 +9,8 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
+    "dev:lan": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
