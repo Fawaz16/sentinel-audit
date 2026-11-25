@@ -246,10 +246,13 @@ name arriving by some other path returns `SECURITY_BLOCK`.
 ### 1. Clone and install
 
 ```bash
-git clone <your-fork-url> captain-foxv1
-cd captain-foxv1
+git clone https://github.com/Fawaz16/sentinel-audit.git
+cd sentinel-audit
 npm install
 ```
+
+> The repository is `sentinel-audit`; the project inside it is `captain-foxv1`
+> (the npm package name, and the name used throughout the docs).
 
 ### 2. Prove the security layer works, before any setup
 
@@ -454,7 +457,7 @@ detector" to "find the field the guard still lets through".
 ## Project layout
 
 ```text
-captain-foxv1/
+sentinel-audit/                   # repo root (npm package: captain-foxv1)
 ├── README.md
 ├── CLAUDE.md                      # spec + invariants (also AI-assistant context)
 ├── .env.example
