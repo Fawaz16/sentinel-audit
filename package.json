@@ -1,0 +1,36 @@
+{
+  "name": "captain-foxv1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-trust cross-domain guard and adversarial simulation lab for indirect prompt injection, covert agent-to-agent channels, and Biba integrity taint lockout.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/*.test.ts\"",
+    "forge": "node scripts/forge-morse-key.ts",
+    "verify": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@supabase/supabase-js": "^2.119.2",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^26.6.9",
+    "@types/react": "^19.3.1",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2"
+  }
+}
